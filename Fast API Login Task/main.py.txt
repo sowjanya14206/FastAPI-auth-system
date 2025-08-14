@@ -1,0 +1,54 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import os
+
+app = FastAPI()
+
+USERS_FILE = "users.txt"
+SEPARATOR = "|"  # to separate username and password in file
+
+
+class User(BaseModel):
+    username: str
+    password: str
+
+
+def save_user(username: str, password: str):
+    with open(USERS_FILE, "a") as f:
+        f.write(f"{username}{SEPARATOR}{password}\n")
+
+
+def get_users():
+    if not os.path.exists(USERS_FILE):
+        return {}
+    with open(USERS_FILE, "r") as f:
+        lines = f.readlines()
+    users = {}
+    for line in lines:
+        if SEPARATOR in line:
+            user, pwd = line.strip().split(SEPARATOR)
+            users[user] = pwd
+    return users
+
+
+@app.post("/register")
+def register(user: User):
+    users = get_users()
+    if user.username in users:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    save_user(user.username, user.password)
+    return {"message": "User registered successfully"}
+
+
+@app.post("/login")
+def login(user: User):
+    users = get_users()
+    if user.username not in users or users[user.username] != user.password:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {"message": "Login successful"}
+
+
+@app.post("/logout")
+def logout():
+    # No real session handling — just returning a success message
+    return {"message": "Logout successful"}
